@@ -25,6 +25,11 @@ const outputFile = path.join(__dirname, "output.txt");
 
 // Function to read 'n' lines from a file
 const readLines = async (filePath, linesToRead) => {
+  if (!fs.existsSync(filePath)) {
+    console.warn(`Warning: File ${filePath} not found. Skipping.`);
+    return []; // Skip processing if the file does not exist
+  }
+
   const lines = [];
   const fileStream = fs.createReadStream(filePath);
 
@@ -33,13 +38,18 @@ const readLines = async (filePath, linesToRead) => {
     crlfDelay: Infinity,
   });
 
-  for await (const line of rl) {
-    if (lines.length < linesToRead) {
-      lines.push(line);
-    } else {
-      break;
+  try {
+    for await (const line of rl) {
+      if (lines.length < linesToRead) {
+        lines.push(line);
+      } else {
+        break;
+      }
     }
+  } catch (error) {
+    console.error(`Error reading ${filePath}:`, error.message);
   }
+
   return lines;
 };
 
@@ -55,12 +65,18 @@ const processFiles = async () => {
       const lines = await readLines(fileName, linesToRead);
       lines.forEach((line) => outputStream.write(line + "\n"));
     } catch (error) {
-      console.error(`Error reading ${fileName}:`, error.message);
+      console.error(`Error processing ${fileName}:`, error.message);
     }
   }
 
   outputStream.end();
-  console.log(`Content written to ${outputFile}`);
+  outputStream.on("finish", () => {
+    console.log(`✅ Content successfully written to ${outputFile}`);
+  });
+
+  outputStream.on("error", (error) => {
+    console.error(`Error writing to ${outputFile}:`, error.message);
+  });
 };
 
 // Run the main function
